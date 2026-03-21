@@ -7,31 +7,20 @@ use logic::{CellContent, CellState, GameStatus, Grid};
 use std::time::{Duration, Instant};
 
 fn main() -> eframe::Result<()> {
-    let mut icon_data = vec![0u8; 32 * 32 * 4];
-    for i in 0..32 {
-        for j in 0..32 {
-            let idx = (i * 32 + j) * 4;
-            icon_data[idx] = 192; icon_data[idx + 1] = 192; icon_data[idx + 2] = 192; icon_data[idx + 3] = 255;
-            let dx = i as i32 - 16;
-            let dy = j as i32 - 16;
-            if dx * dx + dy * dy < 81 {
-                icon_data[idx] = 0; icon_data[idx + 1] = 0; icon_data[idx + 2] = 0; icon_data[idx + 3] = 255;
-            }
-            if (dx.abs() < 2 && dy.abs() < 14) || (dy.abs() < 2 && dx.abs() < 14) {
-                 if dx*dx + dy*dy < 196 {
-                    icon_data[idx] = 0; icon_data[idx + 1] = 0; icon_data[idx + 2] = 0; icon_data[idx + 3] = 255;
-                 }
-            }
-        }
-    }
+    let icon_bytes = include_bytes!("../assets/bob-omb.ico");
+    let icon_image = image::load_from_memory(icon_bytes)
+        .expect("Failed to load icon")
+        .to_rgba8();
+    let (icon_width, icon_height) = icon_image.dimensions();
+    let icon_rgba = icon_image.into_raw();
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([900.0, 750.0])
             .with_icon(std::sync::Arc::new(egui::IconData {
-                rgba: icon_data,
-                width: 32,
-                height: 32,
+                rgba: icon_rgba,
+                width: icon_width,
+                height: icon_height,
             })),
         ..Default::default()
     };
