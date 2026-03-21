@@ -61,16 +61,32 @@ impl Difficulty {
 }
 
 impl Minesweeper {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let difficulty = Difficulty::Easy;
         let (w, h, m) = difficulty.settings();
-        Minesweeper {
+        let slf = Minesweeper {
             grid: Grid::new(w, h, m),
             start_time: None,
             elapsed: Duration::default(),
             difficulty,
             has_flagged: false,
-        }
+        };
+        let size = slf.desired_size();
+        cc.egui_ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+        slf
+    }
+
+    fn desired_size(&self) -> egui::Vec2 {
+        let (w, h, _) = self.difficulty.settings();
+        let cell_size = 30.0;
+        let header_height = 80.0;
+        let padding = 20.0;
+        let grid_w = w as f32 * cell_size;
+        let grid_h = h as f32 * cell_size;
+        let total_w = grid_w + padding * 2.0;
+        let total_h = grid_h + header_height + padding;
+        // Top menu ~24px, Bottom status ~24px
+        egui::vec2(total_w, total_h + 26.0 + 26.0)
     }
 
     fn reset(&mut self) {
@@ -81,9 +97,13 @@ impl Minesweeper {
         self.has_flagged = false;
     }
 
-    fn set_difficulty(&mut self, d: Difficulty) {
-        self.difficulty = d;
-        self.reset();
+    fn set_difficulty(&mut self, d: Difficulty, ctx: &egui::Context) {
+        if self.difficulty != d {
+            self.difficulty = d;
+            self.reset();
+            let size = self.desired_size();
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+        }
     }
 
     fn draw_bevel(&self, painter: &egui::Painter, rect: egui::Rect, width: f32, raised: bool) {
@@ -195,9 +215,30 @@ impl eframe::App for Minesweeper {
 
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                if ui.button("Easy").clicked() { self.set_difficulty(Difficulty::Easy); }
-                if ui.button("Medium").clicked() { self.set_difficulty(Difficulty::Medium); }
-                if ui.button("Hard").clicked() { self.set_difficulty(Difficulty::Hard); }
+                if ui.button("Easy").clicked() { self.set_difficulty(Difficulty::Easy, ctx); }
+                if ui.button("Medium").clicked() { self.set_difficulty(Difficulty::Medium, ctx); }
+                if ui.button("Hard").clicked() { self.set_difficulty(Difficulty::Hard, ctx); }
+            });
+        });
+
+        egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                match self.grid.status {
+                    GameStatus::Won => {
+                        let msg = if self.has_flagged { "Game Cleared" } else { "Game Cleared (NF)" };
+                        ui.label(egui::RichText::new(msg).strong());
+                    }
+                    GameStatus::Lost => {
+                        ui.label(egui::RichText::new("Game Over").color(egui::Color32::RED));
+                    }
+                    GameStatus::Playing => {
+                        if self.start_time.is_some() {
+                            ui.label("Playing...");
+                        } else {
+                            ui.label("Ready");
+                        }
+                    }
+                }
             });
         });
 
@@ -350,17 +391,6 @@ impl eframe::App for Minesweeper {
                         _ => {}
                     }
                 }
-            }
-
-            if self.grid.status == GameStatus::Won {
-                let msg = if self.has_flagged { "Game Cleared" } else { "Game Cleared (NF)" };
-                painter.text(
-                    egui::pos2(start_x + total_w / 2.0, start_y + total_h + 15.0),
-                    egui::Align2::CENTER_CENTER,
-                    msg,
-                    egui::FontId::proportional(20.0),
-                    egui::Color32::BLACK,
-                );
             }
         });
     }
