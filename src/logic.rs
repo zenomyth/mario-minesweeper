@@ -34,6 +34,7 @@ pub struct Grid {
     pub status: GameStatus,
     pub mine_count: usize,
     pub first_click: bool,
+    pub exploded_mine: Option<(usize, usize)>,
 }
 
 impl Grid {
@@ -53,6 +54,7 @@ impl Grid {
             status: GameStatus::Playing,
             mine_count,
             first_click: true,
+            exploded_mine: None,
         }
     }
 
@@ -163,6 +165,7 @@ impl Grid {
             CellContent::Mine => {
                 self.get_cell_mut(x, y).state = CellState::Revealed;
                 self.status = GameStatus::Lost;
+                self.exploded_mine = Some((x, y));
                 for c in &mut self.cells {
                     if c.content == CellContent::Mine {
                         c.state = CellState::Revealed;

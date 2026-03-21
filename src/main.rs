@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod logic;
 
 use eframe::egui;
@@ -312,7 +314,12 @@ impl eframe::App for Minesweeper {
                         CellState::Revealed => {
                             match cell.content {
                                 CellContent::Mine => {
-                                    painter.rect_filled(rect, 0.0, egui::Color32::RED);
+                                    if self.grid.exploded_mine == Some((x, y)) {
+                                        painter.rect_filled(rect, 0.0, egui::Color32::RED);
+                                    } else {
+                                        painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(217, 217, 217));
+                                        painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(153, 153, 153)), egui::StrokeKind::Inside);
+                                    }
                                 }
                                 _ => {
                                     painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(217, 217, 217));
@@ -356,11 +363,12 @@ impl eframe::App for Minesweeper {
                 }
             }
 
-            if self.grid.status == GameStatus::Won && !self.has_flagged {
+            if self.grid.status == GameStatus::Won {
+                let msg = if self.has_flagged { "Game Cleared" } else { "Game Cleared (NF)" };
                 painter.text(
                     egui::pos2(start_x + total_w / 2.0, start_y + total_h + 15.0),
                     egui::Align2::CENTER_CENTER,
-                    "Game Cleared (NF)",
+                    msg,
                     egui::FontId::proportional(20.0),
                     egui::Color32::BLACK,
                 );
