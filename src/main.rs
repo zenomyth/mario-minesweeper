@@ -78,7 +78,7 @@ impl Minesweeper {
 
     fn desired_size(&self) -> egui::Vec2 {
         let (w, h, _) = self.difficulty.settings();
-        let cell_size = 30.0;
+        let cell_size = 24.0;
         let header_height = 80.0;
         let padding = 20.0;
         let grid_w = w as f32 * cell_size;
@@ -106,11 +106,75 @@ impl Minesweeper {
         }
     }
 
+    fn draw_7seg_digit(&self, painter: &egui::Painter, rect: egui::Rect, digit: char, color: egui::Color32) {
+        let w = rect.width();
+        let h = rect.height();
+        let thickness = w * 0.15;
+        let gap = 1.0;
+
+        let segments = match digit {
+            '0' => [true, true, true, true, true, true, false],
+            '1' => [false, true, true, false, false, false, false],
+            '2' => [true, true, false, true, true, false, true],
+            '3' => [true, true, true, true, false, false, true],
+            '4' => [false, true, true, false, false, true, true],
+            '5' => [true, false, true, true, false, true, true],
+            '6' => [true, false, true, true, true, true, true],
+            '7' => [true, true, true, false, false, false, false],
+            '8' => [true, true, true, true, true, true, true],
+            '9' => [true, true, true, true, false, true, true],
+            '-' => [false, false, false, false, false, false, true],
+            _ => [false, false, false, false, false, false, false],
+        };
+
+        let draw_seg = |idx: usize, r: egui::Rect| {
+            if segments[idx] {
+                painter.rect_filled(r, 1.0, color);
+            } else {
+                painter.rect_filled(r, 1.0, color.gamma_multiply(0.1));
+            }
+        };
+
+        // a: top
+        draw_seg(0, egui::Rect::from_min_max(rect.left_top() + egui::vec2(gap, 0.0), rect.left_top() + egui::vec2(w - gap, thickness)));
+        // b: top-right
+        draw_seg(1, egui::Rect::from_min_max(rect.right_top() + egui::vec2(-thickness, gap), rect.right_top() + egui::vec2(0.0, h / 2.0 - gap / 2.0)));
+        // c: bottom-right
+        draw_seg(2, egui::Rect::from_min_max(rect.right_bottom() + egui::vec2(-thickness, -h / 2.0 + gap / 2.0), rect.right_bottom() + egui::vec2(0.0, -gap)));
+        // d: bottom
+        draw_seg(3, egui::Rect::from_min_max(rect.left_bottom() + egui::vec2(gap, -thickness), rect.left_bottom() + egui::vec2(w - gap, 0.0)));
+        // e: bottom-left
+        draw_seg(4, egui::Rect::from_min_max(rect.left_bottom() + egui::vec2(0.0, -h / 2.0 + gap / 2.0), rect.left_bottom() + egui::vec2(thickness, -gap)));
+        // f: top-left
+        draw_seg(5, egui::Rect::from_min_max(rect.left_top() + egui::vec2(0.0, gap), rect.left_top() + egui::vec2(thickness, h / 2.0 - gap / 2.0)));
+        // g: middle
+        draw_seg(6, egui::Rect::from_center_size(rect.center(), egui::vec2(w - gap * 2.0, thickness)));
+    }
+
+    fn draw_digital_display(&self, painter: &egui::Painter, val: String, rect: egui::Rect) {
+        painter.rect_filled(rect, 0.0, egui::Color32::BLACK);
+        let digit_w = (rect.width() - 10.0) / 3.0;
+        let digit_h = rect.height() - 10.0;
+        
+        let mut chars: Vec<char> = val.chars().collect();
+        while chars.len() < 3 {
+            chars.insert(0, ' ');
+        }
+
+        for (i, &c) in chars.iter().enumerate() {
+            let digit_rect = egui::Rect::from_min_size(
+                rect.left_top() + egui::vec2(5.0 + i as f32 * digit_w, 5.0),
+                egui::vec2(digit_w - 2.0, digit_h)
+            );
+            self.draw_7seg_digit(painter, digit_rect, c, egui::Color32::RED);
+        }
+    }
+
     fn draw_bevel(&self, painter: &egui::Painter, rect: egui::Rect, width: f32, raised: bool) {
         let (top_left_color, bottom_right_color) = if raised {
-            (egui::Color32::WHITE, egui::Color32::from_rgb(102, 102, 102))
+            (egui::Color32::WHITE, egui::Color32::from_rgb(80, 80, 80))
         } else {
-            (egui::Color32::from_rgb(102, 102, 102), egui::Color32::WHITE)
+            (egui::Color32::from_rgb(80, 80, 80), egui::Color32::WHITE)
         };
 
         let stroke_tl = egui::Stroke::new(width, top_left_color);
@@ -121,17 +185,6 @@ impl Minesweeper {
         
         painter.line_segment([rect.right_top(), rect.right_bottom()], stroke_br);
         painter.line_segment([rect.right_bottom(), rect.left_bottom()], stroke_br);
-    }
-
-    fn draw_digital_display(&self, painter: &egui::Painter, val: String, rect: egui::Rect) {
-        painter.rect_filled(rect, 0.0, egui::Color32::BLACK);
-        painter.text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            val,
-            egui::FontId::monospace(32.0),
-            egui::Color32::RED,
-        );
     }
 
     fn draw_smiley(&self, painter: &egui::Painter, rect: egui::Rect, status: GameStatus, any_cell_pressed: bool) {
@@ -243,7 +296,7 @@ impl eframe::App for Minesweeper {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let cell_size = 30.0;
+            let cell_size = 24.0;
             let header_height = 80.0;
             let padding = 20.0;
 
@@ -263,7 +316,7 @@ impl eframe::App for Minesweeper {
             );
 
             let painter = ui.painter();
-            painter.rect_filled(board_rect, 0.0, egui::Color32::from_rgb(192, 192, 192));
+            painter.rect_filled(board_rect, 0.0, egui::Color32::from_rgb(160, 160, 160));
             self.draw_bevel(&painter, board_rect, 3.0, true);
 
             let header_rect = egui::Rect::from_min_size(
@@ -272,19 +325,19 @@ impl eframe::App for Minesweeper {
             );
             self.draw_bevel(&painter, header_rect, 2.0, false);
 
-            let mine_count = (self.grid.mine_count as i32 - self.grid.flagged_count() as i32).max(0);
+            let mine_count = (self.grid.mine_count as i32 - self.grid.flagged_count() as i32).max(-99).min(999);
             let mine_display_rect = egui::Rect::from_min_size(
                 egui::pos2(start_x + 20.0, start_y + 20.0),
                 egui::vec2(75.0, 40.0),
             );
-            self.draw_digital_display(&painter, format!("{:03}", mine_count), mine_display_rect);
+            self.draw_digital_display(&painter, format!("{}", mine_count), mine_display_rect);
 
             let time_count = self.elapsed.as_secs().min(999);
             let time_display_rect = egui::Rect::from_min_size(
                 egui::pos2(start_x + total_w - 95.0, start_y + 20.0),
                 egui::vec2(75.0, 40.0),
             );
-            self.draw_digital_display(&painter, format!("{:03}", time_count), time_display_rect);
+            self.draw_digital_display(&painter, format!("{}", time_count), time_display_rect);
 
             let grid_rect = egui::Rect::from_min_size(
                 egui::pos2(start_x + padding, start_y + header_height),
@@ -300,11 +353,12 @@ impl eframe::App for Minesweeper {
             if smiley_response.clicked() {
                 self.reset();
             }
-            painter.rect_filled(smiley_rect, 0.0, egui::Color32::from_rgb(204, 204, 204));
+            painter.rect_filled(smiley_rect, 0.0, egui::Color32::from_rgb(180, 180, 180));
             self.draw_bevel(&painter, smiley_rect, 2.0, !smiley_response.is_pointer_button_down_on());
 
             self.draw_smiley(&painter, smiley_rect, self.grid.status, any_cell_pressed);
 
+            // Added frame around game grids (sunken)
             self.draw_bevel(&painter, grid_rect, 3.0, false);
 
             for y in 0..self.grid.height {
@@ -347,21 +401,21 @@ impl eframe::App for Minesweeper {
                                     if self.grid.exploded_mine == Some((x, y)) {
                                         painter.rect_filled(rect, 0.0, egui::Color32::RED);
                                     } else {
-                                        painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(217, 217, 217));
-                                        painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(153, 153, 153)), egui::StrokeKind::Inside);
+                                        painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(180, 180, 180));
+                                        painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(120, 120, 120)), egui::StrokeKind::Inside);
                                     }
                                 }
                                 _ => {
-                                    painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(217, 217, 217));
-                                    painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(153, 153, 153)), egui::StrokeKind::Inside);
+                                    painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(180, 180, 180));
+                                    painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(120, 120, 120)), egui::StrokeKind::Inside);
                                 }
                             }
                         }
                         CellState::VictoryRevealed => {
-                            painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(0, 204, 0));
+                            painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(0, 180, 0));
                         }
                         _ => {
-                            painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(192, 192, 192));
+                            painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(160, 160, 160));
                             let pressed = response.is_pointer_button_down_on();
                             self.draw_bevel(&painter, rect, 2.0, !pressed);
                         }
@@ -369,12 +423,12 @@ impl eframe::App for Minesweeper {
 
                     match cell.state {
                         CellState::Flagged | CellState::VictoryRevealed => {
-                            painter.text(rect.center(), egui::Align2::CENTER_CENTER, "🚩", egui::FontId::proportional(20.0), egui::Color32::RED);
+                            painter.text(rect.center(), egui::Align2::CENTER_CENTER, "🚩", egui::FontId::proportional(cell_size * 0.7), egui::Color32::RED);
                         }
                         CellState::Revealed => {
                             match cell.content {
                                 CellContent::Mine => {
-                                    painter.text(rect.center(), egui::Align2::CENTER_CENTER, "💣", egui::FontId::proportional(20.0), egui::Color32::BLACK);
+                                    painter.text(rect.center(), egui::Align2::CENTER_CENTER, "💣", egui::FontId::proportional(cell_size * 0.7), egui::Color32::BLACK);
                                 }
                                 CellContent::Empty(0) => {}
                                 CellContent::Empty(n) => {
@@ -382,7 +436,7 @@ impl eframe::App for Minesweeper {
                                         rect.center(),
                                         egui::Align2::CENTER_CENTER,
                                         n.to_string(),
-                                        egui::FontId::proportional(22.0),
+                                        egui::FontId::proportional(cell_size * 0.8),
                                         number_color(n),
                                     );
                                 }
