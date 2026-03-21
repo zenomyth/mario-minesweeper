@@ -37,7 +37,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "Rust Minesweeper",
+        "Mario Minesweeper",
         native_options,
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::light());
