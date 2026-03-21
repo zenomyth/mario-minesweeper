@@ -358,8 +358,8 @@ impl eframe::App for Minesweeper {
 
             self.draw_smiley(&painter, smiley_rect, self.grid.status, any_cell_pressed);
 
-            // Added frame around game grids (sunken)
-            self.draw_bevel(&painter, grid_rect, 3.0, false);
+            // Added frame around game grids (sunken) - Expanded to be visible around cells
+            self.draw_bevel(&painter, grid_rect.expand(3.0), 3.0, false);
 
             for y in 0..self.grid.height {
                 for x in 0..self.grid.width {
@@ -402,17 +402,18 @@ impl eframe::App for Minesweeper {
                                         painter.rect_filled(rect, 0.0, egui::Color32::RED);
                                     } else {
                                         painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(180, 180, 180));
-                                        painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(120, 120, 120)), egui::StrokeKind::Inside);
+                                        painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 80, 80)), egui::StrokeKind::Inside);
                                     }
                                 }
                                 _ => {
                                     painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(180, 180, 180));
-                                    painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(120, 120, 120)), egui::StrokeKind::Inside);
+                                    painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 80, 80)), egui::StrokeKind::Inside);
                                 }
                             }
                         }
                         CellState::VictoryRevealed => {
                             painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(0, 180, 0));
+                            painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 80, 80)), egui::StrokeKind::Inside);
                         }
                         _ => {
                             painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(160, 160, 160));
