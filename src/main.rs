@@ -79,7 +79,7 @@ impl Minesweeper {
     fn desired_size(&self) -> egui::Vec2 {
         let (w, h, _) = self.difficulty.settings();
         let cell_size = 24.0;
-        let header_height = 80.0;
+        let header_height = 60.0;
         let padding = 20.0;
         let grid_w = w as f32 * cell_size;
         let grid_h = h as f32 * cell_size;
@@ -297,7 +297,7 @@ impl eframe::App for Minesweeper {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let cell_size = 24.0;
-            let header_height = 80.0;
+            let header_height = 60.0;
             let padding = 20.0;
 
             let grid_w = self.grid.width as f32 * cell_size;
@@ -319,23 +319,24 @@ impl eframe::App for Minesweeper {
             painter.rect_filled(board_rect, 0.0, egui::Color32::from_rgb(160, 160, 160));
             self.draw_bevel(&painter, board_rect, 3.0, true);
 
+            // Header rect - Aligned to grid frame (both use expand(3.0))
             let header_rect = egui::Rect::from_min_size(
-                egui::pos2(start_x + 10.0, start_y + 10.0),
-                egui::vec2(total_w - 20.0, header_height - 20.0),
+                egui::pos2(start_x + padding, start_y + 10.0),
+                egui::vec2(grid_w, header_height - 20.0),
             );
-            self.draw_bevel(&painter, header_rect, 2.0, false);
+            self.draw_bevel(&painter, header_rect.expand(3.0), 3.0, false);
 
             let mine_count = (self.grid.mine_count as i32 - self.grid.flagged_count() as i32).max(-99).min(999);
             let mine_display_rect = egui::Rect::from_min_size(
-                egui::pos2(start_x + 20.0, start_y + 20.0),
-                egui::vec2(75.0, 40.0),
+                egui::pos2(start_x + padding + 5.0, start_y + 15.0),
+                egui::vec2(60.0, 30.0),
             );
             self.draw_digital_display(&painter, format!("{}", mine_count), mine_display_rect);
 
             let time_count = self.elapsed.as_secs().min(999);
             let time_display_rect = egui::Rect::from_min_size(
-                egui::pos2(start_x + total_w - 95.0, start_y + 20.0),
-                egui::vec2(75.0, 40.0),
+                egui::pos2(start_x + padding + grid_w - 65.0, start_y + 15.0),
+                egui::vec2(60.0, 30.0),
             );
             self.draw_digital_display(&painter, format!("{}", time_count), time_display_rect);
 
@@ -346,8 +347,8 @@ impl eframe::App for Minesweeper {
 
             let any_cell_pressed = ui.input(|i| i.pointer.primary_down()) && ui.rect_contains_pointer(grid_rect);
 
-            let smiley_pos = egui::pos2(start_x + total_w / 2.0 - 20.0, start_y + 20.0);
-            let smiley_rect = egui::Rect::from_min_size(smiley_pos, egui::vec2(40.0, 40.0));
+            let smiley_pos = egui::pos2(start_x + padding + grid_w / 2.0 - 15.0, start_y + 15.0);
+            let smiley_rect = egui::Rect::from_min_size(smiley_pos, egui::vec2(30.0, 30.0));
             
             let smiley_response = ui.interact(smiley_rect, ui.id().with("smiley"), egui::Sense::click());
             if smiley_response.clicked() {
@@ -358,7 +359,7 @@ impl eframe::App for Minesweeper {
 
             self.draw_smiley(&painter, smiley_rect, self.grid.status, any_cell_pressed);
 
-            // Added frame around game grids (sunken) - Expanded to be visible around cells
+            // Sunken frame around game grids - Aligned with header
             self.draw_bevel(&painter, grid_rect.expand(3.0), 3.0, false);
 
             for y in 0..self.grid.height {
@@ -417,6 +418,7 @@ impl eframe::App for Minesweeper {
                         }
                         _ => {
                             painter.rect_filled(rect, 0.0, egui::Color32::from_rgb(160, 160, 160));
+                            painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 80, 80)), egui::StrokeKind::Inside);
                             let pressed = response.is_pointer_button_down_on();
                             self.draw_bevel(&painter, rect, 2.0, !pressed);
                         }
