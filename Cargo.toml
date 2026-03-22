@@ -5,8 +5,9 @@ edition = "2024"
 
 [dependencies]
 chrono = "0.4.44"
-eframe = "0.31.0"
-image = { version = "0.25.0", features = ["ico"] }
+eframe = { version = "0.31.0", features = ["default"] }
+egui_extras = { version = "0.31.0", features = ["all_loaders"] }
+image = { version = "0.25.0", features = ["ico", "webp"] }
 rand = "0.10.0"
 
 [build-dependencies]

@@ -29,6 +29,7 @@ fn main() -> eframe::Result<()> {
         "Mario Minesweeper",
         native_options,
         Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
             cc.egui_ctx.set_visuals(egui::Visuals::dark());
             Ok(Box::new(Minesweeper::new(cc)))
         }),
@@ -176,7 +177,7 @@ impl Minesweeper {
         draw_seg(0, egui::Rect::from_min_max(rect.left_top() + egui::vec2(gap, 0.0), rect.left_top() + egui::vec2(w - gap, thickness)));
         draw_seg(1, egui::Rect::from_min_max(rect.right_top() + egui::vec2(-thickness, gap), rect.right_top() + egui::vec2(0.0, h / 2.0 - gap / 2.0)));
         draw_seg(2, egui::Rect::from_min_max(rect.right_bottom() + egui::vec2(-thickness, -h / 2.0 + gap / 2.0), rect.right_bottom() + egui::vec2(0.0, -gap)));
-        draw_seg(3, egui::Rect::from_min_max(rect.left_bottom() + egui::vec2(gap, -thickness), rect.left_bottom() + egui::vec2(w - gap, 0.0)));
+        draw_seg(3, egui::Rect::from_min_max(rect.left_bottom() + egui::vec2(gap, -thickness), rect.left_bottom() + egui::vec2(w - gap, 0.0)));     
         draw_seg(4, egui::Rect::from_min_max(rect.left_bottom() + egui::vec2(0.0, -h / 2.0 + gap / 2.0), rect.left_bottom() + egui::vec2(thickness, -gap)));
         draw_seg(5, egui::Rect::from_min_max(rect.left_top() + egui::vec2(0.0, gap), rect.left_top() + egui::vec2(thickness, h / 2.0 - gap / 2.0)));
         draw_seg(6, egui::Rect::from_center_size(rect.center(), egui::vec2(w - gap * 2.0, thickness)));
@@ -256,55 +257,20 @@ impl Minesweeper {
         painter.circle_filled(center + egui::vec2(-r*0.4, -r*0.4), r*0.25, egui::Color32::WHITE.gamma_multiply(0.8));
     }
 
-    fn draw_smiley(&self, painter: &egui::Painter, rect: egui::Rect, status: GameStatus, any_cell_pressed: bool) {
-        let center = rect.center();
-        let radius = rect.width() / 2.0 * 0.8;
-        painter.circle_filled(center, radius, egui::Color32::from_rgb(240, 200, 0));
-        painter.circle_stroke(center, radius, egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)));
-
-        match status {
+    fn draw_emoji(&self, ui: &mut egui::Ui, rect: egui::Rect, status: GameStatus, any_cell_pressed: bool) {
+        let source = match status {
             GameStatus::Playing => {
                 if any_cell_pressed {
-                    painter.circle_filled(center + egui::vec2(-radius * 0.35, -radius * 0.3), radius * 0.12, egui::Color32::from_rgb(40, 40, 40));
-                    painter.circle_filled(center + egui::vec2(radius * 0.35, -radius * 0.3), radius * 0.12, egui::Color32::from_rgb(40, 40, 40));
-                    painter.circle_stroke(center + egui::vec2(0.0, radius * 0.35), radius * 0.2, egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)));
+                    egui::include_image!("../assets/surprised.webp")
                 } else {
-                    painter.circle_filled(center + egui::vec2(-radius * 0.35, -radius * 0.3), radius * 0.1, egui::Color32::from_rgb(40, 40, 40));
-                    painter.circle_filled(center + egui::vec2(radius * 0.35, -radius * 0.3), radius * 0.1, egui::Color32::from_rgb(40, 40, 40));
-                    let p1 = center + egui::vec2(-radius * 0.4, radius * 0.2);
-                    let p2 = center + egui::vec2(0.0, radius * 0.45);
-                    let p3 = center + egui::vec2(radius * 0.4, radius * 0.2);
-                    painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                    painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
+                    egui::include_image!("../assets/neutral.webp")
                 }
             }
-            GameStatus::Won => {
-                let glass_w = radius * 0.4;
-                let glass_h = radius * 0.3;
-                painter.rect_filled(egui::Rect::from_center_size(center + egui::vec2(-radius * 0.35, -radius * 0.25), egui::vec2(glass_w, glass_h)), 1.0, egui::Color32::from_rgb(40, 40, 40));
-                painter.rect_filled(egui::Rect::from_center_size(center + egui::vec2(radius * 0.35, -radius * 0.25), egui::vec2(glass_w, glass_h)), 1.0, egui::Color32::from_rgb(40, 40, 40));
-                painter.line_segment([center + egui::vec2(-radius * 0.2, -radius * 0.25), center + egui::vec2(radius * 0.2, -radius * 0.25)], egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)));
-                let p1 = center + egui::vec2(-radius * 0.4, radius * 0.2);
-                let p2 = center + egui::vec2(0.0, radius * 0.45);
-                let p3 = center + egui::vec2(radius * 0.4, radius * 0.2);
-                painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-            }
-            GameStatus::Lost => {
-                let eye_r = radius * 0.15;
-                let eye1 = center + egui::vec2(-radius * 0.35, -radius * 0.3);
-                painter.line_segment([eye1 - egui::vec2(eye_r, eye_r), eye1 + egui::vec2(eye_r, eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                painter.line_segment([eye1 - egui::vec2(eye_r, -eye_r), eye1 + egui::vec2(eye_r, -eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                let eye2 = center + egui::vec2(radius * 0.35, -radius * 0.3);
-                painter.line_segment([eye2 - egui::vec2(eye_r, eye_r), eye2 + egui::vec2(eye_r, eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                painter.line_segment([eye2 - egui::vec2(eye_r, -eye_r), eye2 + egui::vec2(eye_r, -eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                let p1 = center + egui::vec2(-radius * 0.4, radius * 0.45);
-                let p2 = center + egui::vec2(0.0, radius * 0.2);
-                let p3 = center + egui::vec2(radius * 0.4, radius * 0.45);
-                painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-                painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
-            }
-        }
+            GameStatus::Won => egui::include_image!("../assets/victory.webp"),
+            GameStatus::Lost => egui::include_image!("../assets/defeated.webp"),
+        };
+        
+        ui.put(rect.shrink(2.0), egui::Image::new(source));
     }
 }
 
@@ -359,7 +325,7 @@ impl eframe::App for Minesweeper {
                 painter.rect_filled(board_rect, 0.0, self.theme.board);
                 self.draw_bevel(painter, board_rect, 3.0, true);
 
-                let header_rect = egui::Rect::from_min_size(egui::pos2(start_x + padding, start_y + 10.0), egui::vec2(grid_w, header_height - 20.0));
+                let header_rect = egui::Rect::from_min_size(egui::pos2(start_x + padding, start_y + 10.0), egui::vec2(grid_w, header_height - 20.0));   
                 self.draw_bevel(painter, header_rect.expand(3.0), 3.0, false);
 
                 let mine_count = (self.grid.mine_count as i32 - self.grid.flagged_count() as i32).max(-99).min(999);
@@ -370,17 +336,17 @@ impl eframe::App for Minesweeper {
             let grid_rect = egui::Rect::from_min_size(egui::pos2(start_x + padding, start_y + header_height), egui::vec2(grid_w, grid_h));
             let any_cell_pressed = ui.input(|i| i.pointer.primary_down()) && ui.rect_contains_pointer(grid_rect);
 
-            let smiley_rect = egui::Rect::from_center_size(egui::pos2(start_x + padding + grid_w / 2.0, start_y + 30.0), egui::vec2(30.0, 30.0));
+            let smiley_rect = egui::Rect::from_center_size(egui::pos2(start_x + padding + grid_w / 2.0, start_y + 30.0), egui::vec2(30.0, 30.0));   
             let smiley_response = ui.interact(smiley_rect, ui.id().with("smiley"), egui::Sense::click());
             if smiley_response.clicked() { self.reset(); }
-
+            
             {
                 let painter = ui.painter();
                 painter.rect_filled(smiley_rect, 0.0, self.theme.unrevealed);
                 self.draw_bevel(painter, smiley_rect, 2.0, !smiley_response.is_pointer_button_down_on());
-                self.draw_smiley(painter, smiley_rect, self.grid.status, any_cell_pressed);
                 self.draw_bevel(painter, grid_rect.expand(3.0), 3.0, false);
             }
+            self.draw_emoji(ui, smiley_rect, self.grid.status, any_cell_pressed);
 
             for y in 0..self.grid.height {
                 for x in 0..self.grid.width {
