@@ -7,7 +7,7 @@ use logic::{CellContent, CellState, GameStatus, Grid};
 use std::time::{Duration, Instant};
 
 fn main() -> eframe::Result<()> {
-    let icon_bytes = include_bytes!("../assets/bob-omb.ico");
+    let icon_bytes = include_bytes!("../assets/application.webp");
     let icon_image = image::load_from_memory(icon_bytes)
         .expect("Failed to load icon")
         .to_rgba8();
