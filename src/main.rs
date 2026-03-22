@@ -16,7 +16,7 @@ fn main() -> eframe::Result<()> {
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([400.0, 500.0]) // Initial size, will be resized
+            .with_inner_size([400.0, 500.0])
             .with_icon(std::sync::Arc::new(egui::IconData {
                 rgba: icon_rgba,
                 width: icon_width,
@@ -29,7 +29,7 @@ fn main() -> eframe::Result<()> {
         "Mario Minesweeper",
         native_options,
         Box::new(|cc| {
-            cc.egui_ctx.set_visuals(egui::Visuals::light());
+            cc.egui_ctx.set_visuals(egui::Visuals::dark());
             Ok(Box::new(Minesweeper::new(cc)))
         }),
     )
@@ -41,6 +41,7 @@ struct Minesweeper {
     elapsed: Duration,
     difficulty: Difficulty,
     has_flagged: bool,
+    theme: Theme,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,13 +61,42 @@ impl Difficulty {
     }
 }
 
-// Visual constants
-const COLOR_BOARD: egui::Color32 = egui::Color32::from_rgb(180, 180, 180);
-const COLOR_UNREVEALED: egui::Color32 = egui::Color32::from_rgb(180, 180, 180);
-const COLOR_REVEALED: egui::Color32 = egui::Color32::from_rgb(165, 165, 165);
-const COLOR_HIGHLIGHT: egui::Color32 = egui::Color32::from_rgb(245, 245, 245);
-const COLOR_SHADOW: egui::Color32 = egui::Color32::from_rgb(90, 90, 90);
-const COLOR_GRID_LINE: egui::Color32 = egui::Color32::from_rgb(130, 130, 130);
+struct Theme {
+    board: egui::Color32,
+    unrevealed: egui::Color32,
+    revealed: egui::Color32,
+    grid_line: egui::Color32,
+    highlight: egui::Color32,
+    shadow: egui::Color32,
+    hover: egui::Color32,
+    mine_exploded: egui::Color32,
+    numbers: [egui::Color32; 8],
+}
+
+impl Theme {
+    fn dark() -> Self {
+        Self {
+            board: egui::Color32::from_rgb(32, 32, 32),
+            unrevealed: egui::Color32::from_rgb(60, 60, 60),
+            revealed: egui::Color32::from_rgb(45, 45, 45),
+            grid_line: egui::Color32::from_rgb(40, 40, 40),
+            highlight: egui::Color32::from_rgb(75, 75, 75),
+            shadow: egui::Color32::from_rgb(25, 25, 25),
+            hover: egui::Color32::from_rgb(85, 85, 85),
+            mine_exploded: egui::Color32::from_rgb(150, 50, 50),
+            numbers: [
+                egui::Color32::from_rgb(60, 100, 200),  // 1: muted blue
+                egui::Color32::from_rgb(80, 160, 80),   // 2: softer green
+                egui::Color32::from_rgb(180, 60, 60),   // 3: deeper red
+                egui::Color32::from_rgb(40, 40, 120),   // 4: dark navy
+                egui::Color32::from_rgb(140, 70, 70),   // 5: brownish red
+                egui::Color32::from_rgb(60, 140, 140),  // 6: muted cyan
+                egui::Color32::from_rgb(20, 20, 20),    // 7: near black
+                egui::Color32::from_rgb(120, 120, 120), // 8: medium gray
+            ],
+        }
+    }
+}
 
 impl Minesweeper {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -78,6 +108,7 @@ impl Minesweeper {
             elapsed: Duration::default(),
             difficulty,
             has_flagged: false,
+            theme: Theme::dark(),
         };
         let size = slf.desired_size();
         cc.egui_ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
@@ -93,7 +124,6 @@ impl Minesweeper {
         let grid_h = h as f32 * cell_size;
         let total_w = grid_w + padding * 2.0;
         let total_h = grid_h + header_height + padding;
-        // Top menu + Bottom status
         egui::vec2(total_w, total_h + 52.0)
     }
 
@@ -156,7 +186,7 @@ impl Minesweeper {
         painter.rect_filled(rect, 0.0, egui::Color32::BLACK);
         let digit_w = (rect.width() - 10.0) / 3.0;
         let digit_h = rect.height() - 10.0;
-        
+
         let mut chars: Vec<char> = val.chars().collect();
         while chars.len() < 3 {
             chars.insert(0, ' ');
@@ -167,15 +197,15 @@ impl Minesweeper {
                 rect.left_top() + egui::vec2(5.0 + i as f32 * digit_w, 5.0),
                 egui::vec2(digit_w - 2.0, digit_h)
             );
-            self.draw_7seg_digit(painter, digit_rect, c, egui::Color32::RED);
+            self.draw_7seg_digit(painter, digit_rect, c, egui::Color32::from_rgb(220, 20, 20));
         }
     }
 
     fn draw_bevel(&self, painter: &egui::Painter, rect: egui::Rect, width: f32, raised: bool) {
         let (tl, br) = if raised {
-            (COLOR_HIGHLIGHT, COLOR_SHADOW)
+            (self.theme.highlight, self.theme.shadow)
         } else {
-            (COLOR_SHADOW, COLOR_HIGHLIGHT)
+            (self.theme.shadow, self.theme.highlight)
         };
 
         let stroke_tl = egui::Stroke::new(width, tl);
@@ -191,20 +221,17 @@ impl Minesweeper {
         let center = rect.center();
         let s = rect.width() * 0.6;
         let pole_x = center.x - s * 0.15;
-        
-        // Pole
+
         painter.line_segment(
             [egui::pos2(pole_x, center.y - s * 0.35), egui::pos2(pole_x, center.y + s * 0.4)],
             egui::Stroke::new(s * 0.1, egui::Color32::BLACK)
         );
-        // Flag
         let path = vec![
             egui::pos2(pole_x, center.y - s * 0.35),
             egui::pos2(pole_x + s * 0.5, center.y - s * 0.1),
             egui::pos2(pole_x, center.y + s * 0.15),
         ];
-        painter.add(egui::Shape::convex_polygon(path, egui::Color32::RED, egui::Stroke::NONE));
-        // Base
+        painter.add(egui::Shape::convex_polygon(path, egui::Color32::from_rgb(200, 30, 30), egui::Stroke::NONE));
         painter.line_segment(
             [egui::pos2(pole_x - s * 0.2, center.y + s * 0.4), egui::pos2(pole_x + s * 0.2, center.y + s * 0.4)],
             egui::Stroke::new(s * 0.1, egui::Color32::BLACK)
@@ -214,70 +241,68 @@ impl Minesweeper {
     fn draw_mine(&self, painter: &egui::Painter, rect: egui::Rect, exploded: bool) {
         let center = rect.center();
         let r = rect.width() * 0.3;
-        
+
         if exploded {
             painter.circle_filled(center, r * 1.5, egui::Color32::from_rgba_unmultiplied(255, 0, 0, 100));
         }
 
-        painter.circle_filled(center, r, egui::Color32::BLACK);
-        // Spikes
+        painter.circle_filled(center, r, egui::Color32::from_rgb(30, 30, 30));
         for i in 0..8 {
             let angle = i as f32 * std::f32::consts::PI / 4.0;
             let p1 = center + egui::vec2(angle.cos(), angle.sin()) * r;
             let p2 = center + egui::vec2(angle.cos(), angle.sin()) * r * 1.5;
-            painter.line_segment([p1, p2], egui::Stroke::new(1.5, egui::Color32::BLACK));
+            painter.line_segment([p1, p2], egui::Stroke::new(1.5, egui::Color32::from_rgb(30, 30, 30)));
         }
-        // Shine
-        painter.circle_filled(center + egui::vec2(-r*0.4, -r*0.4), r*0.25, egui::Color32::WHITE);
+        painter.circle_filled(center + egui::vec2(-r*0.4, -r*0.4), r*0.25, egui::Color32::WHITE.gamma_multiply(0.8));
     }
 
     fn draw_smiley(&self, painter: &egui::Painter, rect: egui::Rect, status: GameStatus, any_cell_pressed: bool) {
         let center = rect.center();
         let radius = rect.width() / 2.0 * 0.8;
-        painter.circle_filled(center, radius, egui::Color32::YELLOW);
-        painter.circle_stroke(center, radius, egui::Stroke::new(1.0, egui::Color32::BLACK));
+        painter.circle_filled(center, radius, egui::Color32::from_rgb(240, 200, 0));
+        painter.circle_stroke(center, radius, egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)));
 
         match status {
             GameStatus::Playing => {
                 if any_cell_pressed {
-                    painter.circle_filled(center + egui::vec2(-radius * 0.35, -radius * 0.3), radius * 0.12, egui::Color32::BLACK);
-                    painter.circle_filled(center + egui::vec2(radius * 0.35, -radius * 0.3), radius * 0.12, egui::Color32::BLACK);
-                    painter.circle_stroke(center + egui::vec2(0.0, radius * 0.35), radius * 0.2, egui::Stroke::new(1.0, egui::Color32::BLACK));
+                    painter.circle_filled(center + egui::vec2(-radius * 0.35, -radius * 0.3), radius * 0.12, egui::Color32::from_rgb(40, 40, 40));
+                    painter.circle_filled(center + egui::vec2(radius * 0.35, -radius * 0.3), radius * 0.12, egui::Color32::from_rgb(40, 40, 40));
+                    painter.circle_stroke(center + egui::vec2(0.0, radius * 0.35), radius * 0.2, egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)));
                 } else {
-                    painter.circle_filled(center + egui::vec2(-radius * 0.35, -radius * 0.3), radius * 0.1, egui::Color32::BLACK);
-                    painter.circle_filled(center + egui::vec2(radius * 0.35, -radius * 0.3), radius * 0.1, egui::Color32::BLACK);
+                    painter.circle_filled(center + egui::vec2(-radius * 0.35, -radius * 0.3), radius * 0.1, egui::Color32::from_rgb(40, 40, 40));
+                    painter.circle_filled(center + egui::vec2(radius * 0.35, -radius * 0.3), radius * 0.1, egui::Color32::from_rgb(40, 40, 40));
                     let p1 = center + egui::vec2(-radius * 0.4, radius * 0.2);
                     let p2 = center + egui::vec2(0.0, radius * 0.45);
                     let p3 = center + egui::vec2(radius * 0.4, radius * 0.2);
-                    painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::BLACK));
-                    painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::BLACK));
+                    painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
+                    painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
                 }
             }
             GameStatus::Won => {
                 let glass_w = radius * 0.4;
                 let glass_h = radius * 0.3;
-                painter.rect_filled(egui::Rect::from_center_size(center + egui::vec2(-radius * 0.35, -radius * 0.25), egui::vec2(glass_w, glass_h)), 1.0, egui::Color32::BLACK);
-                painter.rect_filled(egui::Rect::from_center_size(center + egui::vec2(radius * 0.35, -radius * 0.25), egui::vec2(glass_w, glass_h)), 1.0, egui::Color32::BLACK);
-                painter.line_segment([center + egui::vec2(-radius * 0.2, -radius * 0.25), center + egui::vec2(radius * 0.2, -radius * 0.25)], egui::Stroke::new(1.0, egui::Color32::BLACK));
+                painter.rect_filled(egui::Rect::from_center_size(center + egui::vec2(-radius * 0.35, -radius * 0.25), egui::vec2(glass_w, glass_h)), 1.0, egui::Color32::from_rgb(40, 40, 40));
+                painter.rect_filled(egui::Rect::from_center_size(center + egui::vec2(radius * 0.35, -radius * 0.25), egui::vec2(glass_w, glass_h)), 1.0, egui::Color32::from_rgb(40, 40, 40));
+                painter.line_segment([center + egui::vec2(-radius * 0.2, -radius * 0.25), center + egui::vec2(radius * 0.2, -radius * 0.25)], egui::Stroke::new(1.0, egui::Color32::from_rgb(40, 40, 40)));
                 let p1 = center + egui::vec2(-radius * 0.4, radius * 0.2);
                 let p2 = center + egui::vec2(0.0, radius * 0.45);
                 let p3 = center + egui::vec2(radius * 0.4, radius * 0.2);
-                painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::BLACK));
-                painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::BLACK));
+                painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
+                painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
             }
             GameStatus::Lost => {
                 let eye_r = radius * 0.15;
                 let eye1 = center + egui::vec2(-radius * 0.35, -radius * 0.3);
-                painter.line_segment([eye1 - egui::vec2(eye_r, eye_r), eye1 + egui::vec2(eye_r, eye_r)], egui::Stroke::new(1.2, egui::Color32::BLACK));
-                painter.line_segment([eye1 - egui::vec2(eye_r, -eye_r), eye1 + egui::vec2(eye_r, -eye_r)], egui::Stroke::new(1.2, egui::Color32::BLACK));
+                painter.line_segment([eye1 - egui::vec2(eye_r, eye_r), eye1 + egui::vec2(eye_r, eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
+                painter.line_segment([eye1 - egui::vec2(eye_r, -eye_r), eye1 + egui::vec2(eye_r, -eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
                 let eye2 = center + egui::vec2(radius * 0.35, -radius * 0.3);
-                painter.line_segment([eye2 - egui::vec2(eye_r, eye_r), eye2 + egui::vec2(eye_r, eye_r)], egui::Stroke::new(1.2, egui::Color32::BLACK));
-                painter.line_segment([eye2 - egui::vec2(eye_r, -eye_r), eye2 + egui::vec2(eye_r, -eye_r)], egui::Stroke::new(1.2, egui::Color32::BLACK));
+                painter.line_segment([eye2 - egui::vec2(eye_r, eye_r), eye2 + egui::vec2(eye_r, eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
+                painter.line_segment([eye2 - egui::vec2(eye_r, -eye_r), eye2 + egui::vec2(eye_r, -eye_r)], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
                 let p1 = center + egui::vec2(-radius * 0.4, radius * 0.45);
                 let p2 = center + egui::vec2(0.0, radius * 0.2);
                 let p3 = center + egui::vec2(radius * 0.4, radius * 0.45);
-                painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::BLACK));
-                painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::BLACK));
+                painter.line_segment([p1, p2], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
+                painter.line_segment([p2, p3], egui::Stroke::new(1.2, egui::Color32::from_rgb(40, 40, 40)));
             }
         }
     }
@@ -306,7 +331,7 @@ impl eframe::App for Minesweeper {
                         ui.label(egui::RichText::new(msg).strong());
                     }
                     GameStatus::Lost => {
-                        ui.label(egui::RichText::new("Game Over").color(egui::Color32::RED));
+                        ui.label(egui::RichText::new("Game Over").color(egui::Color32::from_rgb(200, 50, 50)));
                     }
                     GameStatus::Playing => {
                         if self.start_time.is_some() { ui.label("Playing..."); } else { ui.label("Ready"); }
@@ -329,16 +354,18 @@ impl eframe::App for Minesweeper {
             let start_y = available_rect.top() + (available_rect.height() - total_h) / 2.0;
 
             let board_rect = egui::Rect::from_min_size(egui::pos2(start_x, start_y), egui::vec2(total_w, total_h));
-            let painter = ui.painter();
-            painter.rect_filled(board_rect, 0.0, COLOR_BOARD);
-            self.draw_bevel(&painter, board_rect, 3.0, true);
+            {
+                let painter = ui.painter();
+                painter.rect_filled(board_rect, 0.0, self.theme.board);
+                self.draw_bevel(painter, board_rect, 3.0, true);
 
-            let header_rect = egui::Rect::from_min_size(egui::pos2(start_x + padding, start_y + 10.0), egui::vec2(grid_w, header_height - 20.0));
-            self.draw_bevel(&painter, header_rect.expand(3.0), 3.0, false);
+                let header_rect = egui::Rect::from_min_size(egui::pos2(start_x + padding, start_y + 10.0), egui::vec2(grid_w, header_height - 20.0));
+                self.draw_bevel(painter, header_rect.expand(3.0), 3.0, false);
 
-            let mine_count = (self.grid.mine_count as i32 - self.grid.flagged_count() as i32).max(-99).min(999);
-            self.draw_digital_display(&painter, format!("{}", mine_count), egui::Rect::from_min_size(egui::pos2(start_x + padding + 5.0, start_y + 15.0), egui::vec2(60.0, 30.0)));
-            self.draw_digital_display(&painter, format!("{}", self.elapsed.as_secs().min(999)), egui::Rect::from_min_size(egui::pos2(start_x + padding + grid_w - 65.0, start_y + 15.0), egui::vec2(60.0, 30.0)));
+                let mine_count = (self.grid.mine_count as i32 - self.grid.flagged_count() as i32).max(-99).min(999);
+                self.draw_digital_display(painter, format!("{}", mine_count), egui::Rect::from_min_size(egui::pos2(start_x + padding + 5.0, start_y + 15.0), egui::vec2(60.0, 30.0)));
+                self.draw_digital_display(painter, format!("{}", self.elapsed.as_secs().min(999)), egui::Rect::from_min_size(egui::pos2(start_x + padding + grid_w - 65.0, start_y + 15.0), egui::vec2(60.0, 30.0)));
+            }
 
             let grid_rect = egui::Rect::from_min_size(egui::pos2(start_x + padding, start_y + header_height), egui::vec2(grid_w, grid_h));
             let any_cell_pressed = ui.input(|i| i.pointer.primary_down()) && ui.rect_contains_pointer(grid_rect);
@@ -346,11 +373,14 @@ impl eframe::App for Minesweeper {
             let smiley_rect = egui::Rect::from_center_size(egui::pos2(start_x + padding + grid_w / 2.0, start_y + 30.0), egui::vec2(30.0, 30.0));
             let smiley_response = ui.interact(smiley_rect, ui.id().with("smiley"), egui::Sense::click());
             if smiley_response.clicked() { self.reset(); }
-            painter.rect_filled(smiley_rect, 0.0, COLOR_UNREVEALED);
-            self.draw_bevel(&painter, smiley_rect, 2.0, !smiley_response.is_pointer_button_down_on());
-            self.draw_smiley(&painter, smiley_rect, self.grid.status, any_cell_pressed);
 
-            self.draw_bevel(&painter, grid_rect.expand(3.0), 3.0, false);
+            {
+                let painter = ui.painter();
+                painter.rect_filled(smiley_rect, 0.0, self.theme.unrevealed);
+                self.draw_bevel(painter, smiley_rect, 2.0, !smiley_response.is_pointer_button_down_on());
+                self.draw_smiley(painter, smiley_rect, self.grid.status, any_cell_pressed);
+                self.draw_bevel(painter, grid_rect.expand(3.0), 3.0, false);
+            }
 
             for y in 0..self.grid.height {
                 for x in 0..self.grid.width {
@@ -368,55 +398,48 @@ impl eframe::App for Minesweeper {
                     }
 
                     let cell = self.grid.get_cell(x, y);
+                    let painter = ui.painter();
                     match cell.state {
                         CellState::Revealed => {
-                            let bg = if self.grid.exploded_mine == Some((x, y)) { egui::Color32::RED } else { COLOR_REVEALED };
+                            let bg = if self.grid.exploded_mine == Some((x, y)) { self.theme.mine_exploded } else { self.theme.revealed };
                             painter.rect_filled(rect, 0.0, bg);
-                            painter.rect_stroke(rect, 0.0, egui::Stroke::new(0.5, COLOR_GRID_LINE), egui::StrokeKind::Inside);
+                            painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, self.theme.grid_line), egui::StrokeKind::Inside);
                             match cell.content {
-                                CellContent::Mine => self.draw_mine(&painter, rect, self.grid.exploded_mine == Some((x, y))),
+                                CellContent::Mine => self.draw_mine(painter, rect, self.grid.exploded_mine == Some((x, y))),
                                 CellContent::Empty(n) if n > 0 => {
-                                    painter.text(rect.center(), egui::Align2::CENTER_CENTER, n.to_string(), egui::FontId::proportional(18.0), number_color(n));
+                                    painter.text(
+                                        rect.center(),
+                                        egui::Align2::CENTER_CENTER,
+                                        n.to_string(),
+                                        egui::FontId::proportional(20.0),
+                                        self.theme.numbers[n as usize - 1]
+                                    );
                                 }
                                 _ => {}
                             }
                         }
                         CellState::VictoryRevealed => {
-                            painter.rect_filled(rect, 0.0, COLOR_REVEALED);
-                            painter.rect_stroke(rect, 0.0, egui::Stroke::new(0.5, COLOR_GRID_LINE), egui::StrokeKind::Inside);
-                            self.draw_flag(&painter, rect);
+                            painter.rect_filled(rect, 0.0, self.theme.revealed);
+                            painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, self.theme.grid_line), egui::StrokeKind::Inside);
+                            self.draw_flag(painter, rect);
                         }
                         CellState::Flagged => {
-                            painter.rect_filled(rect, 0.0, COLOR_UNREVEALED);
-                            self.draw_bevel(&painter, rect, 2.0, true);
-                            self.draw_flag(&painter, rect);
+                            painter.rect_filled(rect, 0.0, self.theme.unrevealed);
+                            self.draw_bevel(painter, rect, 2.0, true);
+                            self.draw_flag(painter, rect);
                         }
                         _ => {
-                            let mut fill = COLOR_UNREVEALED;
-                            if response.hovered() { 
-                                fill = egui::Color32::from_rgb(200, 200, 200); 
+                            let mut fill = self.theme.unrevealed;
+                            if response.hovered() {
+                                fill = self.theme.hover;
                             }
                             painter.rect_filled(rect, 0.0, fill);
                             let pressed = response.is_pointer_button_down_on();
-                            self.draw_bevel(&painter, rect, 2.0, !pressed);
+                            self.draw_bevel(painter, rect, 2.0, !pressed);
                         }
                     }
                 }
             }
         });
-    }
-}
-
-fn number_color(n: u8) -> egui::Color32 {
-    match n {
-        1 => egui::Color32::from_rgb(0, 0, 255),
-        2 => egui::Color32::from_rgb(0, 128, 0),
-        3 => egui::Color32::from_rgb(255, 0, 0),
-        4 => egui::Color32::from_rgb(0, 0, 128),
-        5 => egui::Color32::from_rgb(128, 0, 0),
-        6 => egui::Color32::from_rgb(0, 128, 128),
-        7 => egui::Color32::BLACK,
-        8 => egui::Color32::from_rgb(128, 128, 128),
-        _ => egui::Color32::BLACK,
     }
 }
